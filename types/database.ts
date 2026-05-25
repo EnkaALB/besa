@@ -267,6 +267,10 @@ export type Database = {
         Args: Record<string, never>;
         Returns: undefined;
       };
+      is_besa_member: {
+        Args: { p_besa_id: string };
+        Returns: boolean;
+      };
     };
     Enums: {
       besa_status: BesaStatus;
