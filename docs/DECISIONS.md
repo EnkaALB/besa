@@ -119,6 +119,28 @@
 
 ---
 
+---
+
+## 2026-05-24 — Sprint 1.1 (Supabase clients)
+
+### #20 — Génération de `types/database.ts` : manuelle pour le MVP
+- **Statut** : adopté pour MVP, à reconsidérer Sprint 4
+- **Contexte** : `npx supabase gen types --db-url` requiert Docker Desktop pour spawn un container `postgres-meta` même quand on cible une DB distante. Docker n'est pas installé sur la machine de dev.
+- **Options évaluées** :
+  - Installer Docker Desktop — overhead non négligeable pour 1 commande occasionnelle
+  - Login interactif + `supabase link --project-ref` + `gen types --linked` — nécessite browser flow + token d'accès personnel
+  - Script custom d'introspection via `pg` — overengineering
+  - **Types manuels alignés sur la migration** — choisi
+- **Décision** : `types/database.ts` écrit à la main, structure identique à la sortie supabase CLI (Row/Insert/Update/Relationships pour chaque table, sous-schémas vides en `{ [_ in never]: never }`).
+- **Conséquence** : risque de drift entre DB et types. Mitigation : revue systématique à chaque migration + tests Vitest qui exécutent du SQL réel à partir du Sprint 3.
+
+### #21 — Middleware Next.js : refresh session + check onboarding
+- **Statut** : adopté
+- **Décision** : middleware appelle `supabase.auth.getUser()` sur chaque navigation (pour rafraîchir la session selon les recommandations Supabase). Sur les routes privées, vérifie aussi `users.username IS NOT NULL` et redirige vers `/onboarding` sinon.
+- **Conséquence** : 1 query DB sur chaque navigation privée. Acceptable pour MVP (table users petite, index sur id). À optimiser via JWT custom claim si le profil/score est consulté très fréquemment (Sprint 4+).
+
+---
+
 ## Format pour les futures décisions
 
 ```markdown
