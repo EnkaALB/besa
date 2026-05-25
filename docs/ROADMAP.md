@@ -33,11 +33,13 @@
 - [ ] Renommer vers `supabase/migrations/0001_initial.sql` après validation
 
 ### 0.4 — Cloud setup (après GO du schéma)
-- [ ] Projet Supabase EU (Frankfurt) — création + clés env
-- [ ] Migration initiale appliquée
-- [ ] Repo GitHub privé `besa` (via `gh`)
-- [ ] Projet Vercel lié, déploiement preview
-- [ ] CI GitHub Actions : typecheck + lint + test
+- [x] Projet Supabase EU (Frankfurt) — `hnnepxcankeirxkagedo`, clés dans `.env.local`
+- [x] Migration 0001 appliquée et vérifiée (5 tables / RLS / 12 policies / RPC / triggers)
+- [x] Outillage migration : `scripts/apply-migration.mjs` + `scripts/verify-schema.mjs` (deps `pg` + `@types/pg`)
+- [x] CI GitHub Actions définie (`.github/workflows/ci.yml`) — déclenchée après push GitHub
+- [ ] Repo GitHub privé `besa` (en attente : `gh` absent, choix option A/B/C utilisateur)
+- [ ] Projet Vercel lié, déploiement preview (après GitHub)
+- [x] Premier commit local `5347f83` — Sprint 0 fondations
 
 ### 0.5 — Livrable Sprint 0
 - URL Vercel preview avec page d'accueil dans le design system
