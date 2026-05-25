@@ -1,9 +1,11 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   createBesaSchema,
   signBesaSchema,
@@ -11,6 +13,99 @@ import {
   type SignBesaInput,
 } from "@/lib/validators/besa";
 import { generateInviteToken } from "@/lib/tokens/invite";
+import { sendEmail } from "@/lib/email/client";
+import { cosignerSignedEmail } from "@/lib/email/templates/cosigner-signed";
+
+async function getOrigin(): Promise<string> {
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL;
+  if (fromEnv) return fromEnv.replace(/\/+$/, "");
+  const hdrs = await headers();
+  const proto = hdrs.get("x-forwarded-proto") ?? "https";
+  const host = hdrs.get("host") ?? "localhost:3000";
+  return `${proto}://${host}`;
+}
+
+/**
+ * Envoie l'email de notification au créateur quand le cosigner vient de signer.
+ * Best-effort : si Resend n'est pas configuré ou échoue, on log et on continue.
+ * NE BLOQUE PAS le flow de signature.
+ */
+async function notifyCreatorOfSignature(input: {
+  besaId: string;
+  creatorId: string;
+  cosignerId: string;
+  creatorWeight: number;
+  cosignerWeight: number;
+  weightFinal: number;
+}): Promise<void> {
+  try {
+    const admin = createAdminClient();
+
+    // 1. Email + nom du créateur
+    const [{ data: creatorAuth }, { data: creatorProfile }, { data: cosignerProfile }, { data: besa }] =
+      await Promise.all([
+        admin.auth.admin.getUserById(input.creatorId),
+        admin
+          .from("users")
+          .select("full_name, username")
+          .eq("id", input.creatorId)
+          .maybeSingle(),
+        admin
+          .from("users")
+          .select("full_name, username")
+          .eq("id", input.cosignerId)
+          .maybeSingle(),
+        admin
+          .from("besas")
+          .select("title, description, deadline")
+          .eq("id", input.besaId)
+          .maybeSingle(),
+      ]);
+
+    const creatorEmail = creatorAuth?.user?.email;
+    if (!creatorEmail) {
+      console.warn("[notifyCreator] creator email missing — skip");
+      return;
+    }
+    if (!besa) {
+      console.warn("[notifyCreator] besa missing — skip");
+      return;
+    }
+
+    const creatorName =
+      creatorProfile?.full_name ?? creatorProfile?.username ?? "Toi";
+    const cosignerName =
+      cosignerProfile?.full_name ?? cosignerProfile?.username ?? "Ton co-signataire";
+
+    const origin = await getOrigin();
+    const besaUrl = `${origin}/besa/${input.besaId}`;
+
+    const content = cosignerSignedEmail({
+      creatorName,
+      cosignerName,
+      title: besa.title,
+      description: besa.description,
+      creatorWeight: input.creatorWeight,
+      cosignerWeight: input.cosignerWeight,
+      weightFinal: input.weightFinal,
+      deadline: besa.deadline,
+      besaUrl,
+    });
+
+    const result = await sendEmail({
+      to: creatorEmail,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+    });
+
+    if (!result.ok) {
+      console.warn("[notifyCreator] sendEmail failed:", result.error);
+    }
+  } catch (err) {
+    console.error("[notifyCreator] unexpected error:", err);
+  }
+}
 
 export type CreateBesaResult =
   | { ok: true; besaId: string; token: string }
@@ -194,6 +289,25 @@ export async function signBesa(input: SignBesaInput): Promise<SignBesaResult> {
       cosignerWeight: parsed.data.weight_ressenti,
       weightFinal: 0,
     };
+  }
+
+  // Récupère creator_id pour notification
+  const { data: besaForCreator } = await supabase
+    .from("besas")
+    .select("creator_id")
+    .eq("id", besaId)
+    .maybeSingle();
+
+  // Envoi de l'email de notification (best-effort, ne bloque pas)
+  if (besaForCreator?.creator_id) {
+    void notifyCreatorOfSignature({
+      besaId,
+      creatorId: besaForCreator.creator_id,
+      cosignerId: user.id,
+      creatorWeight,
+      cosignerWeight: parsed.data.weight_ressenti,
+      weightFinal: Number(weightFinal),
+    });
   }
 
   revalidatePath("/", "layout");

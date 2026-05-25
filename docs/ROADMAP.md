@@ -98,25 +98,40 @@
 
 ---
 
-## Sprint 2 — Création de besa + lien d'invitation
+## Sprint 2 — Création de besa + lien d'invitation ✅ EN COURS DE CLÔTURE (2026-05-24)
 
 **Objectif** : flux complet « Je crée une besa → j'invite quelqu'un → il signe → la besa est active ».
 
-- Formulaire de création `/besa/new` — titre, description, deadline (DatePicker), poids 1-10 avec micro-copy
-- Génération token base62 12 chars (`crypto.randomBytes`)
-- Stockage `besa_invites`, expiration 7j, usage unique
-- Page d'atterrissage `/b/{token}` — **la page la plus stratégique du produit**
-  - Affichage créateur (nom, photo, score s'il existe)
-  - Titre, description, échéance
-  - **Poids du créateur masqué** jusqu'à signature
-  - Un seul gros bouton "Donner ma besa"
-- Auth conditionnel (magic link si nouveau) puis signature
-- Pose du poids en aveugle (curseur 1-10)
-- Animation de révélation des deux poids, calcul de la moyenne
-- Transition vers `active`, notification email aux deux parties
-- Tests Vitest : expiration des tokens, unicité d'usage, transitions d'état
+### 2.1 — Token + validators ✅
+- `lib/tokens/invite.ts` : 12 chars base62, `crypto.randomBytes`, ~71 bits d'entropie
+- `lib/validators/besa.ts` : title/description/deadline/weight + createBesaSchema + signBesaSchema + weightLabel()
+- 29 tests Vitest
 
-**Livrable** : flux end-to-end signature → besa active.
+### 2.2 — Création de besa ✅
+- `/besa/new` (Server + form Client avec slider Radix)
+- `lib/actions/besa.ts` : `createBesa` Server Action (INSERT besa + party + invite, rollback en cascade, retry sur collision)
+- `/besa/[id]` page détail (share link si draft, poids si active)
+
+### 2.3 + 2.4 — Page d'atterrissage + signature en aveugle ✅
+- `/b/[token]` Server Component (admin client bypass RLS — token = secret)
+- Gère 5 cas d'erreur : not_found, expired, used, already_active, self
+- `BesaSigningCard` Client avec 3 phases (input / submitting / revealed)
+- Animation `besa-fade-up` staggered sur la révélation (créateur → cosigner → final)
+- RPC `consume_invite` atomique (anti-race, plafond 3/jour)
+
+### 2.5 — Notification email + tests ✅
+- Resend intégré : email au créateur quand le cosigner signe
+- Template HTML responsive (Gmail/Outlook compatible) + escapeHtml anti-XSS
+- Fallback texte
+- Best-effort : ne bloque pas la signature si email échoue
+- 6 tests Vitest sur le template
+- Home dashboard (cf. commit `520e072`) — list besas créées + signées, CTA, status, weight
+
+**Livrable Sprint 2** :
+- Flux end-to-end : créer → partager → signer → email au créateur ✓
+- 12 routes Next.js, 60 tests verts
+- 3 migrations DB (0001 initial / 0002 storage / 0003 anonymize)
+- Home page utile (dashboard pour user connecté)
 
 **⛔ GO avant Sprint 3.**
 
