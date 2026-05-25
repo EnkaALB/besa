@@ -11,14 +11,20 @@ function isPublicPath(pathname: string): boolean {
   return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
-export async function middleware(request: NextRequest) {
+/**
+ * Next.js 16 a renommé `middleware` en `proxy` (cf. nextjs.org/docs/messages/middleware-to-proxy).
+ * Rôle :
+ *  - Rafraîchir la session Supabase sur chaque navigation (recommandation Supabase)
+ *  - Forcer la redirection vers `/onboarding` si l'utilisateur n'a pas encore choisi son username
+ *  - Bloquer l'accès aux routes privées si non authentifié
+ */
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !anonKey) {
-    // Pas de Supabase configuré → on laisse passer (utile en dev minimal)
     return supabaseResponse;
   }
 
@@ -37,7 +43,6 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  // Toujours rafraîchir la session (recommandation Supabase)
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -45,19 +50,16 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const publik = isPublicPath(pathname);
 
-  // Route publique : on laisse passer (session déjà rafraîchie)
   if (publik) {
     return supabaseResponse;
   }
 
-  // Pas authentifié sur route privée → /login
   if (!user) {
     const redirect = new URL("/login", request.url);
     redirect.searchParams.set("next", pathname);
     return NextResponse.redirect(redirect);
   }
 
-  // Authentifié : check onboarding
   const { data: profile } = await supabase
     .from("users")
     .select("username")
@@ -80,7 +82,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Tous les paths sauf assets statiques et favicon
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
