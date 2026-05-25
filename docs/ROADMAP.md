@@ -38,15 +38,16 @@
 - [x] Outillage migration : `scripts/apply-migration.mjs` + `scripts/verify-schema.mjs` (deps `pg` + `@types/pg`)
 - [x] CI GitHub Actions définie (`.github/workflows/ci.yml`) — déclenchée après push GitHub
 - [x] Repo GitHub privé `EnkaALB/besa` créé manuellement, remote `origin` configuré, `main` poussé
-- [ ] Projet Vercel lié, déploiement preview (après GitHub) — **en cours, à faire côté utilisateur via dashboard**
+- [x] Projet Vercel lié, preview en ligne : <https://besa-six.vercel.app/>
 - [x] Premier commit local `5347f83` — Sprint 0 fondations
 - [x] Deuxième commit `e61fbca` — outillage migration + apply
+- [x] Troisième commit `fab95f4` — roadmap update
 
-### 0.5 — Livrable Sprint 0
-- URL Vercel preview avec page d'accueil dans le design system
-- Repo GitHub avec les 4 docs à jour
-- Supabase prêt avec le schéma validé
-- CI verte sur `main`
+### 0.5 — Livrable Sprint 0 ✅ ATTEINT (2026-05-24)
+- [x] URL Vercel preview avec page d'accueil dans le design system : <https://besa-six.vercel.app/>
+- [x] Repo GitHub privé `EnkaALB/besa` avec les 4 docs à jour
+- [x] Supabase EU/Frankfurt prêt avec schéma validé et appliqué
+- [x] CI workflow définie (à vérifier sur l'onglet Actions du repo)
 
 **⛔ GO requis avant Sprint 1.**
 

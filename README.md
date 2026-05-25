@@ -5,6 +5,8 @@
 
 Application qui permet à deux parties de **sceller, suivre et valider** des engagements pris l'un envers l'autre. Chaque besa tenue (ou non tenue, ou contestée) impacte le **Besa Score** public — une nouvelle forme de capital social.
 
+**Preview MVP** : <https://besa-six.vercel.app/>
+
 ## Documentation
 
 - [`docs/CLAUDE.md`](docs/CLAUDE.md) — Brief pérenne (vision, MVP, stack, principes)
