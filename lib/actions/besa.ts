@@ -4,11 +4,26 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
-import { createBesaSchema, type CreateBesaInput } from "@/lib/validators/besa";
+import {
+  createBesaSchema,
+  signBesaSchema,
+  type CreateBesaInput,
+  type SignBesaInput,
+} from "@/lib/validators/besa";
 import { generateInviteToken } from "@/lib/tokens/invite";
 
 export type CreateBesaResult =
   | { ok: true; besaId: string; token: string }
+  | { ok: false; error: string };
+
+export type SignBesaResult =
+  | {
+      ok: true;
+      besaId: string;
+      creatorWeight: number;
+      cosignerWeight: number;
+      weightFinal: number;
+    }
   | { ok: false; error: string };
 
 const MAX_TOKEN_RETRIES = 3;
@@ -103,4 +118,91 @@ export async function createBesa(input: CreateBesaInput): Promise<CreateBesaResu
 
   revalidatePath("/", "layout");
   redirect(`/besa/${besa.id}`);
+}
+
+/**
+ * Signature d'une besa par le cosigner.
+ *
+ * Flow :
+ *  1. Vérifie auth + onboarding du cosigner (username non NULL)
+ *  2. Appelle RPC `consume_invite(token, weight)` — atomique, gère token expiré/utilisé,
+ *     plafond 3/jour entre 2 mêmes users, calcule weight_final, INSERT cosigner party,
+ *     UPDATE besa → 'active'
+ *  3. Récupère les deux poids + weight_final pour la révélation
+ */
+export async function signBesa(input: SignBesaInput): Promise<SignBesaResult> {
+  const parsed = signBesaSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Données invalides" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { ok: false, error: "Non authentifié" };
+  }
+
+  // Vérifie l'onboarding (sinon la besa serait signée par un fantôme sans pseudo)
+  const { data: profile } = await supabase
+    .from("users")
+    .select("username")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile?.username) {
+    return {
+      ok: false,
+      error: "Termine d'abord ton inscription (choix d'un pseudo).",
+    };
+  }
+
+  // Appel RPC atomique
+  const { data: besaId, error: rpcError } = await supabase.rpc("consume_invite", {
+    p_token: parsed.data.token,
+    p_weight_ressenti: parsed.data.weight_ressenti,
+  });
+
+  if (rpcError) {
+    return { ok: false, error: rpcError.message };
+  }
+  if (!besaId) {
+    return { ok: false, error: "Aucun ID retourné par le RPC" };
+  }
+
+  // Récupère les deux poids + weight_final pour la révélation
+  const [partiesRes, besaRes] = await Promise.all([
+    supabase
+      .from("besa_parties")
+      .select("role, weight_ressenti")
+      .eq("besa_id", besaId),
+    supabase.from("besas").select("weight_final").eq("id", besaId).maybeSingle(),
+  ]);
+
+  const creatorWeight =
+    partiesRes.data?.find((p) => p.role === "creator")?.weight_ressenti ?? null;
+  const weightFinal = besaRes.data?.weight_final ?? null;
+
+  if (creatorWeight === null || weightFinal === null) {
+    // La RPC a réussi mais on n'arrive pas à lire les détails. Bizarre mais non-bloquant.
+    return {
+      ok: true,
+      besaId,
+      creatorWeight: 0,
+      cosignerWeight: parsed.data.weight_ressenti,
+      weightFinal: 0,
+    };
+  }
+
+  revalidatePath("/", "layout");
+
+  return {
+    ok: true,
+    besaId,
+    creatorWeight,
+    cosignerWeight: parsed.data.weight_ressenti,
+    weightFinal: Number(weightFinal),
+  };
 }
