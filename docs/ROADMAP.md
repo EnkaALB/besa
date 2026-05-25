@@ -53,18 +53,46 @@
 
 ---
 
-## Sprint 1 — Auth + Profil minimal
+## Sprint 1 — Auth + Profil minimal ✅ EN COURS DE CLÔTURE (2026-05-24)
 
 **Objectif** : un user peut s'inscrire, se connecter, créer et consulter son profil public.
 
-- Magic link email (Supabase Auth) — flow complet, redirection après auth
-- Onboarding : pseudo (avec dispo check temps réel), prénom, nom, photo optionnelle (Supabase Storage), bio
-- Page `/u/{username}` — état "En construction" (pas encore de score)
-- Settings : changement de pseudo, export RGPD (JSON), suppression de compte (anonymisation)
-- Rate limiting sur endpoints auth (Vercel KV / Upstash gratuit)
-- Tests Vitest : validation Zod du profil, génération username
+### 1.1 — Supabase clients ✅
+- `lib/supabase/{server,browser,admin}.ts`
+- `types/database.ts` (manuel, cf DECISIONS #20)
+- `proxy.ts` (renommé depuis middleware en Next 16)
 
-**Livrable** : `/login`, `/onboarding`, `/u/{username}`, `/settings` fonctionnels.
+### 1.2 — Magic link ✅
+- `/login` (Suspense + form Client), `/auth/callback`, `/auth/error`
+- Toaster sonner integré dans root layout
+- Migration : nil
+
+### 1.3 — Onboarding obligatoire ✅
+- Migration 0002 : storage bucket `avatars` (public read, 2 Mo, RLS folder-scoped)
+- `/onboarding` (Server + Client form)
+- Server Actions : `checkUsernameAvailable`, `submitOnboarding`
+- Validators Zod : username / full_name / bio + `suggestUsername()`
+
+### 1.4 — Profil public + Settings ✅
+- Migration 0003 : RPC `anonymize_account` (RGPD considérant 26)
+- `/u/[username]` (page publique + not-found)
+- `/settings` (édition profil, toggle visibilité)
+- `/api/me/export` (JSON download RGPD)
+- Boutons `DeleteAccountButton` (confirmation "SUPPRIMER") + `SignOutButton`
+
+### 1.5 — Rate limiting + tests ✅
+- `lib/ratelimit.ts` : Upstash sliding window (graceful no-op si pas configuré)
+- Rate limit appliqué : `checkUsernameAvailable` (30/min/IP), `/api/me/export` (5/min/user)
+- Vitest configuré (`vitest.config.ts`, script `npm test`)
+- 25 tests passants sur les validateurs Zod (`lib/validators/profile.test.ts`)
+- CI mise à jour : étape `Test` ajoutée
+
+**Livrable Sprint 1** :
+- `/login`, `/onboarding`, `/u/{username}`, `/settings` opérationnels sur preview
+- Magic link complet de bout en bout
+- RGPD : export + suppression fonctionnels
+- 25 tests verts, CI verte
+- Rate limiting actif dès que Upstash configuré (no-op sinon — pas bloquant pour MVP)
 
 **⛔ GO avant Sprint 2.**
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
+import { checkRateLimit } from "@/lib/ratelimit";
 
 /**
  * Export RGPD : retourne en JSON l'ensemble des données associées à l'utilisateur
@@ -16,6 +17,20 @@ export async function GET(): Promise<NextResponse> {
 
   if (!user) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  }
+
+  // Rate limit strict (5/min/user) : l'export est lourd
+  const rl = await checkRateLimit(`export:${user.id}`, "strict");
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "Trop de requêtes. Réessaie dans une minute." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000))),
+        },
+      },
+    );
   }
 
   const [profileRes, besasRes, partiesRes, scoreEventsRes] = await Promise.all([

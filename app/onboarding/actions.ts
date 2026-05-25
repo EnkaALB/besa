@@ -1,12 +1,21 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
+import { checkRateLimit } from "@/lib/ratelimit";
 import { onboardingSchema, usernameSchema, type OnboardingInput } from "@/lib/validators/profile";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+
+async function getClientIp(): Promise<string> {
+  const hdrs = await headers();
+  const fwd = hdrs.get("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0]?.trim() ?? "unknown";
+  return hdrs.get("x-real-ip") ?? "unknown";
+}
 
 /**
  * Server Action appelée par le formulaire d'onboarding (debounced) pour vérifier
@@ -16,6 +25,13 @@ export async function checkUsernameAvailable(rawUsername: string): Promise<{
   available: boolean;
   reason?: string;
 }> {
+  // Rate limit (30/min/IP) pour éviter le scraping de pseudos
+  const ip = await getClientIp();
+  const rl = await checkRateLimit(`username-check:${ip}`, "fast");
+  if (!rl.ok) {
+    return { available: false, reason: "Trop de requêtes. Attends un instant." };
+  }
+
   const result = usernameSchema.safeParse(rawUsername);
   if (!result.success) {
     return { available: false, reason: result.error.issues[0]?.message ?? "Format invalide" };
