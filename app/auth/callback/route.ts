@@ -7,8 +7,11 @@ import { createClient } from "@/lib/supabase/server";
  * sur son lien email. Échange le `code` en session, set les cookies, et redirige
  * vers `next` (ou `/`).
  *
- * Si erreur (token expiré, déjà utilisé, etc.), redirige vers /auth/error avec
- * le détail dans l'URL.
+ * En cas d'erreur, Supabase peut renvoyer :
+ *   - `error` (haut niveau, ex: "access_denied")
+ *   - `error_code` (spécifique, ex: "otp_expired", "otp_disabled")
+ *   - `error_description` (texte humain)
+ * On fait suivre tout ça à /auth/error pour un message précis.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const url = new URL(request.url);
@@ -17,11 +20,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/";
   const error = searchParams.get("error");
+  const errorCode = searchParams.get("error_code");
   const errorDescription = searchParams.get("error_description");
 
-  if (error) {
+  if (error || errorCode) {
     const errorUrl = new URL("/auth/error", origin);
-    errorUrl.searchParams.set("error", error);
+    if (error) errorUrl.searchParams.set("error", error);
+    if (errorCode) errorUrl.searchParams.set("error_code", errorCode);
     if (errorDescription) errorUrl.searchParams.set("description", errorDescription);
     return NextResponse.redirect(errorUrl);
   }
