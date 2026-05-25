@@ -263,6 +263,10 @@ export type Database = {
         Args: { p_token: string; p_weight_ressenti: number };
         Returns: string;
       };
+      anonymize_account: {
+        Args: Record<string, never>;
+        Returns: undefined;
+      };
     };
     Enums: {
       besa_status: BesaStatus;
