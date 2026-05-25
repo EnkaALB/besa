@@ -37,9 +37,10 @@
 - [x] Migration 0001 appliquée et vérifiée (5 tables / RLS / 12 policies / RPC / triggers)
 - [x] Outillage migration : `scripts/apply-migration.mjs` + `scripts/verify-schema.mjs` (deps `pg` + `@types/pg`)
 - [x] CI GitHub Actions définie (`.github/workflows/ci.yml`) — déclenchée après push GitHub
-- [ ] Repo GitHub privé `besa` (en attente : `gh` absent, choix option A/B/C utilisateur)
-- [ ] Projet Vercel lié, déploiement preview (après GitHub)
+- [x] Repo GitHub privé `EnkaALB/besa` créé manuellement, remote `origin` configuré, `main` poussé
+- [ ] Projet Vercel lié, déploiement preview (après GitHub) — **en cours, à faire côté utilisateur via dashboard**
 - [x] Premier commit local `5347f83` — Sprint 0 fondations
+- [x] Deuxième commit `e61fbca` — outillage migration + apply
 
 ### 0.5 — Livrable Sprint 0
 - URL Vercel preview avec page d'accueil dans le design system
